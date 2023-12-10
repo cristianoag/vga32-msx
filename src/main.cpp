@@ -6,12 +6,13 @@
 #include "fabgl.h"
 #include "fabutils.h"
 
-#include "src/machine.h"
+#include "machine.h"
+
+#define DEBUG true
 
 // non-free list
 char const *  LIST_URL    = "http://cloud.cbm8bit.com/adamcost/vic20list.txt";
 constexpr int MAXLISTSIZE = 8192;
-
 
 // Flash and SDCard configuration
 #define FORMAT_ON_FAIL     true
@@ -20,15 +21,6 @@ constexpr int MAXLISTSIZE = 8192;
 
 // base path (can be SPIFFS_MOUNT_PATH or SDCARD_MOUNT_PATH depending from what was successfully mounted first)
 char const * basepath = nullptr;
-
-// name of embedded programs directory
-char const * EMBDIR  = "Free";
-
-// name of downloaded programs directory
-char const * DOWNDIR = "List";
-
-// name of user directory (where LOAD and SAVE works)
-char const * USERDIR = "Free";    // same of EMBDIR
 
 struct EmbeddedProgDef {
   char const *    filename;
@@ -186,7 +178,7 @@ class Menu : public uiApp {
       auto cv = canvas();
       cv->selectFont(&fabgl::FONT_SLANT_8x14);
       cv->setPenColor(RGB888(0, 128, 255));
-      cv->drawText(106, 345, "VGA32 MSX Emulator");
+      cv->drawText(66, 345, "VGA32 MSX Emulator");
 
       cv->selectFont(&fabgl::FONT_std_12);
       cv->setPenColor(RGB888(255, 128, 0));
@@ -195,7 +187,7 @@ class Menu : public uiApp {
     };
 
     // programs list
-    fileBrowser = new uiFileBrowser(rootWindow(), Point(5, 10), Size(140, 290), true, STYLE_FILEBROWSER);
+    fileBrowser = new uiFileBrowser(rootWindow(), Point(5, 10), Size(160, 290), true, STYLE_FILEBROWSER);
     fileBrowser->setDirectory(basepath);  // set absolute path
     //fileBrowser->changeDirectory( fileBrowser->content().exists(DOWNDIR, false) ? DOWNDIR : EMBDIR ); // set relative path
     fileBrowser->onChange = [&]() {
@@ -252,7 +244,7 @@ class Menu : public uiApp {
         runMSX();
     };
 
-    int x = 158;
+    int x = 180;
 
     // "Run" button - run the VIC20
     auto VIC20Button = new uiButton(rootWindow(), "Run [F12]", Point(x, 10), Size(75, 19), uiButtonKind::Button, true, STYLE_BUTTON);
@@ -287,89 +279,9 @@ class Menu : public uiApp {
       showHelp();
     };
 
-    int y = 245;
-    
-    new uiStaticLabel(rootWindow(), "Joystick:", Point(150, y), true, STYLE_LABELGROUP);
-    new uiStaticLabel(rootWindow(), "None", Point(180, y + 21), true, STYLE_STATICLABEL);
-    auto radioJNone = new uiCheckBox(rootWindow(), Point(158, y + 20), Size(16, 16), uiCheckBoxKind::RadioButton, true, STYLE_CHECKBOX);
-    new uiStaticLabel(rootWindow(), "Cursor Keys", Point(180, y + 41), true, STYLE_STATICLABEL);
-    auto radioJCurs = new uiCheckBox(rootWindow(), Point(158, y + 40), Size(16, 16), uiCheckBoxKind::RadioButton, true, STYLE_CHECKBOX);
-    new uiStaticLabel(rootWindow(), "Mouse", Point(180, y + 61), true, STYLE_STATICLABEL);
-    auto radioJMous = new uiCheckBox(rootWindow(), Point(158, y + 60), Size(16, 16), uiCheckBoxKind::RadioButton, true, STYLE_CHECKBOX);
-    radioJNone->setGroupIndex(1);
-    radioJCurs->setGroupIndex(1);
-    radioJMous->setGroupIndex(1);
-
     // free space label
     freeSpaceLbl = new uiLabel(rootWindow(), "", Point(5, 304), Size(0, 0), true, STYLE_LABEL);
     updateFreeSpaceLabel();
-
-    // "Download From" label
-    new uiStaticLabel(rootWindow(), "Download From:", Point(5, 326), true, STYLE_LABELGROUP);
-
-    // Download List button (download programs listed and linked in LIST_URL)
-    auto downloadProgsBtn = new uiButton(rootWindow(), "List", Point(13, 345), Size(27, 20), uiButtonKind::Button, true, STYLE_BUTTON);
-    downloadProgsBtn->onClick = [&]() {
-      if (checkWiFi() && messageBox("Download Programs listed in \"LIST_URL\"", "Check your local laws for restrictions", "OK", "Cancel", nullptr, uiMessageBoxIcon::Warning) == uiMessageBoxResult::Button1) {
-        auto pframe = new DownloadProgressFrame(rootWindow());
-        auto modalStatus = initModalWindow(pframe);
-        processModalWindowEvents(modalStatus, 100);
-        prepareForDownload();
-        char * list = downloadList();
-        char * plist = list;
-        int count = countListItems(list);
-        int dcount = 0;
-        for (int i = 0; i < count; ++i) {
-          char const * filename;
-          char const * URL;
-          plist = getNextListItem(plist, &filename, &URL);
-          pframe->label1->setText(filename);
-          if (!processModalWindowEvents(modalStatus, 100))
-            break;
-          if (downloadURL(URL, filename))
-            ++dcount;
-          pframe->label2->setTextFmt("Downloaded %d/%d", dcount, count);
-        }
-        free(list);
-        // modify "abort" button to "OK"
-        pframe->button->setText("OK");
-        pframe->button->repaint();
-        // wait for OK
-        processModalWindowEvents(modalStatus, -1);
-        endModalWindow(modalStatus);
-        destroyWindow(pframe);
-        fileBrowser->update();
-        updateFreeSpaceLabel();
-      }
-      WiFi.disconnect();
-    };
-
-    // Download from URL
-    auto downloadURLBtn = new uiButton(rootWindow(), "URL", Point(48, 345), Size(27, 20), uiButtonKind::Button, true, STYLE_BUTTON);
-    downloadURLBtn->onClick = [&]() {
-      if (checkWiFi()) {
-        char * URL = new char[128];
-        char * filename = new char[25];
-        strcpy(URL, "http://");
-        if (inputBox("Download From URL", "URL", URL, 127, "OK", "Cancel") == uiMessageBoxResult::Button1) {
-          char * lastslash = strrchr(URL, '/');
-          if (lastslash) {
-            strcpy(filename, lastslash + 1);
-            if (inputBox("Download From URL", "Filename", filename, 24, "OK", "Cancel") == uiMessageBoxResult::Button1) {
-              if (downloadURL(URL, filename)) {
-                messageBox("Success", "Download OK!", "OK", nullptr, nullptr);
-                fileBrowser->update();
-                updateFreeSpaceLabel();
-              } else
-                messageBox("Error", "Download Failed!", "OK", nullptr, nullptr, uiMessageBoxIcon::Error);
-            }
-          }
-        }
-        delete [] filename;
-        delete [] URL;
-        WiFi.disconnect();
-      }
-    };
 
     // focus on programs list
     setFocusedWindow(fileBrowser);
@@ -427,7 +339,6 @@ class Menu : public uiApp {
       FileBrowser & dir  = fileBrowser->content();
 
       bool isROM = strstr(fname, ".ROM") || strstr(fname, ".rom");
-      bool isCRT = strstr(fname, ".CRT") || strstr(fname, ".crt");
 
       if (isROM) {
 
@@ -445,150 +356,11 @@ class Menu : public uiApp {
     return backToMSX;
   }
 
-  // true if WiFi is has been connected
-  bool checkWiFi() {
-    if (WiFi.status() == WL_CONNECTED)
-      return true;
-    char SSID[32] = "";
-    char psw[32]  = "";
-    if (!preferences.getString("SSID", SSID, sizeof(SSID)) || !preferences.getString("WiFiPsw", psw, sizeof(psw))) {
-      // ask user for SSID and password
-      if (inputBox("WiFi Connect", "WiFi Name", SSID, sizeof(SSID), "OK", "Cancel") == uiMessageBoxResult::Button1 &&
-          inputBox("WiFi Connect", "Password", psw, sizeof(psw), "OK", "Cancel") == uiMessageBoxResult::Button1) {
-        preferences.putString("SSID", SSID);
-        preferences.putString("WiFiPsw", psw);
-      } else
-        return false;
-    }
-    WiFi.begin(SSID, psw);
-    for (int i = 0; i < 32 && WiFi.status() != WL_CONNECTED; ++i) {
-      delay(500);
-      if (i == 16)
-        WiFi.reconnect();
-    }
-    bool connected = (WiFi.status() == WL_CONNECTED);
-    if (!connected) {
-      messageBox("Network Error", "Failed to connect WiFi. Try again!", "OK", nullptr, nullptr, uiMessageBoxIcon::Error);
-      preferences.remove("WiFiPsw");
-    }
-    return connected;
-  }
-
-  // creates List folder and makes it current
-  void prepareForDownload()
-  {
-    FileBrowser & dir = fileBrowser->content();
-    dir.setDirectory(basepath);
-    dir.makeDirectory(DOWNDIR);
-    dir.changeDirectory(DOWNDIR);
-  }
-
-  // download list from LIST_URL
-  // ret nullptr on fail
-  char * downloadList()
-  {
-    auto list = (char*) malloc(MAXLISTSIZE);
-    auto dest = list;
-    HTTPClient http;
-    http.begin(LIST_URL);
-    int httpCode = http.GET();
-    if (httpCode == HTTP_CODE_OK) {
-      WiFiClient * stream = http.getStreamPtr();
-      int bufspace = MAXLISTSIZE;
-      while (http.connected() && bufspace > 1) {
-        auto size = stream->available();
-        if (size) {
-          int c = stream->readBytes(dest, fabgl::imin(bufspace, size));
-          dest += c;
-          bufspace -= c;
-        } else
-          break;
-      }
-    }
-    *dest = 0;
-    return list;
-  }
-
-  // count number of items in download list
-  int countListItems(char const * list)
-  {
-    int count = 0;
-    auto p = list;
-    while (*p++)
-      if (*p == 0x0a)
-        ++count;
-    return (count + 1) / 3;
-  }
-
-  // extract filename and URL from downloaded list
-  char * getNextListItem(char * list, char const * * filename, char const * * URL)
-  {
-    // bypass spaces
-    while (*list == 0x0a || *list == 0x0d || *list == 0x20)
-      ++list;
-    // get filename
-    *filename = list;
-    while (*list && *list != 0x0a && *list != 0x0d)
-      ++list;
-    *list++ = 0;
-    // bypass spaces
-    while (*list && (*list == 0x0a || *list == 0x0d || *list == 0x20))
-      ++list;
-    // get URL
-    *URL = list;
-    while (*list && *list != 0x0a && *list != 0x0d)
-      ++list;
-    *list++ = 0;
-    return list;
-  }
-
-  // download specified filename from URL
-  bool downloadURL(char const * URL, char const * filename)
-  {
-    FileBrowser & dir = fileBrowser->content();
-    if (dir.exists(filename, false)) {
-      return true;
-    }
-    bool success = false;
-    HTTPClient http;
-    http.begin(URL);
-    int httpCode = http.GET();
-    if (httpCode == HTTP_CODE_OK) {
-
-      int fullpathLen = dir.getFullPath(filename);
-      char fullpath[fullpathLen];
-      dir.getFullPath(filename, fullpath, fullpathLen);
-      FILE * f = fopen(fullpath, "wb");
-
-      if (f) {
-        int len = http.getSize();
-        constexpr int BUFSIZE = 1024;
-        uint8_t * buf = (uint8_t*) malloc(BUFSIZE);
-        WiFiClient * stream = http.getStreamPtr();
-        int dsize = 0;
-        while (http.connected() && (len > 0 || len == -1)) {
-          size_t size = stream->available();
-          if (size) {
-            int c = stream->readBytes(buf, fabgl::imin(BUFSIZE, size));
-            fwrite(buf, c, 1, f);
-            dsize += c;
-            if (len > 0)
-              len -= c;
-          }
-        }
-        free(buf);
-        fclose(f);
-        success = (len == 0 || (len == -1 && dsize > 0));
-      }
-    }
-    return success;
-  }
-
   // show free SPIFFS space
   void updateFreeSpaceLabel() {
     int64_t total, used;
     FileBrowser::getFSInfo(fileBrowser->content().getCurrentDriveType(), 0, &total, &used);
-    freeSpaceLbl->setTextFmt("%lld KiB Free", (total - used) / 1024);
+    freeSpaceLbl->setTextFmt("%lld KB Free", (total - used) / 1024);
     freeSpaceLbl->update();
   }
 
@@ -602,17 +374,10 @@ class Menu : public uiApp {
 };
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
 void setup()
 {
   #if DEBUG
-  Serial.begin(115200); delay(500); Serial.write("\n\n\nReset\n"); // for debug purposes
+    Serial.begin(115200);
   #endif
 
   preferences.begin("MSX", false);
