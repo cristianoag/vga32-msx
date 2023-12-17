@@ -1,35 +1,21 @@
 
-#include "fabgl.h"
-#include "MSX.h"
-#pragma once
+#include <map>
+#include <string>
+#include <vector>
 
-#define MAXDISKS    32      /* Number of disks for a drive   */
+#include "ay8910.hpp"
+#include "msx1.hpp"
+#include "fabgl.h"
+#pragma once
 
 class Machine {
 
-byte *RAM[8];                      /* Main RAM (8x8kB pages) */
-byte *EmptyRAM;                    /* Empty RAM page (8kB)   */
-byte *SRAM;                        /* SRAM (battery backed)  */
-byte *MemMap[4][4][8];   /* Memory maps [PPage][SPage][Addr] */
+  unsigned char* ram;
+  TMS9918A::Context vram;
 
-byte *RAMData;                     /* RAM Mapper contents    */
-byte RAMMapper[4];                 /* RAM Mapper state       */
-byte RAMMask;                      /* RAM Mapper mask        */
-
-byte *ROMData[2];                  /* ROM Mapper contents    */
-byte ROMMapper[2][4];              /* ROM Mappers state      */
-byte ROMMask[2];                   /* ROM Mapper masks       */
-
-/** Kanji font ROM *******************************************/
-byte *Kanji;                       /* Kanji ROM 4096x32      */
-int  KanLetter;                    /* Current letter index   */
-byte KanCount;                     /* Byte count 0..31       */
-
-byte SaveCMOS    = 0;              /* Save CMOS.ROM on exit  */
-byte SaveSRAM    = 0;              /* ~ GMASTER2.RAM on exit */
-byte *Chunks[256];                 /* Memory blocks to free  */
-byte CCount;                       /* Number of memory blcks */
-
+  Z80 cpu;
+  MSX1MMU mmu;
+  TMS9918A vdp;
 
 public:
 
@@ -40,6 +26,8 @@ public:
   void run();
 private:
 
-  byte *LoadROM(const char *Name,int Size,byte *Buf);
+  const int CPU_CLOCK = 3579545;
+  const int VDP_CLOCK = 5370863;
 
+  void vdp_tick();
 };

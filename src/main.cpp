@@ -1,20 +1,14 @@
-#include <Preferences.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <stdio.h>
 
+#include "machine.h"
+#include <Arduino.h>
+#include <Preferences.h>
+#include <stdio.h>
 #include "fabgl.h"
 #include "fabutils.h"
 
-#include "machine.h"
-
 #define DEBUG true
 
-// non-free list
-char const *  LIST_URL    = "http://cloud.cbm8bit.com/adamcost/vic20list.txt";
-constexpr int MAXLISTSIZE = 8192;
-
-// Flash and SDCard configuration
+// Flash and microSDCard configuration
 #define FORMAT_ON_FAIL     true
 #define SPIFFS_MOUNT_PATH  "/flash"
 #define SDCARD_MOUNT_PATH  "/SD"
@@ -22,15 +16,9 @@ constexpr int MAXLISTSIZE = 8192;
 // base path (can be SPIFFS_MOUNT_PATH or SDCARD_MOUNT_PATH depending from what was successfully mounted first)
 char const * basepath = nullptr;
 
-struct EmbeddedProgDef {
-  char const *    filename;
-  uint8_t const * data;
-  int             size;
-};
-
+// FABGL lib VGA and Keyboard controllers
 fabgl::VGAController DisplayController;
 fabgl::PS2Controller PS2Controller;
-
 
 // where to store WiFi info, etc...
 Preferences preferences;
@@ -167,23 +155,22 @@ class Menu : public uiApp {
 
 
   void init() {
+
+  #if DEBUG
+    Serial.println("Menu::init()");
+  #endif
     machine = new Machine(&DisplayController);
 
     setStyle(&dialogStyle);
 
     rootWindow()->frameStyle().backgroundColor = BACKGROUND_COLOR;
 
-    // some static text
+    // static text
     rootWindow()->onPaint = [&]() {
       auto cv = canvas();
       cv->selectFont(&fabgl::FONT_SLANT_8x14);
       cv->setPenColor(RGB888(0, 128, 255));
       cv->drawText(66, 345, "VGA32 MSX Emulator");
-
-      cv->selectFont(&fabgl::FONT_std_12);
-      cv->setPenColor(RGB888(255, 128, 0));
-      //cv->drawText(160, 358, "www.fabgl.com");
-      //cv->drawText(130, 371, "2019/22 by Fabrizio Di Vittorio");
     };
 
     // programs list
@@ -246,7 +233,7 @@ class Menu : public uiApp {
 
     int x = 180;
 
-    // "Run" button - run the VIC20
+    // "Run" button - run the MSX
     auto VIC20Button = new uiButton(rootWindow(), "Run [F12]", Point(x, 10), Size(75, 19), uiButtonKind::Button, true, STYLE_BUTTON);
     VIC20Button->onClick = [&]() {
       runMSX();
@@ -378,6 +365,7 @@ void setup()
 {
   #if DEBUG
     Serial.begin(115200);
+    Serial.println("main::setup()");
   #endif
 
   preferences.begin("MSX", false);
@@ -386,13 +374,7 @@ void setup()
   PS2Controller.begin(PS2Preset::KeyboardPort0_MousePort1, KbdMode::CreateVirtualKeysQueue);
 
   DisplayController.begin();
-  DisplayController.setResolution(VGA_256x384_60Hz);
-
-  // this improves user interface speed - check possible drawbacks before enabling definitively
-  //DisplayController.enableBackgroundPrimitiveExecution(false);
-
-  // adjust this to center screen in your monitor
-  //DisplayController.moveScreen(20, -2);
+  DisplayController.setResolution(QVGA_320x240_60Hz);
 
   Canvas cv(&DisplayController);
   cv.selectFont(&fabgl::FONT_6x8);
