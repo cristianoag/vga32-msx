@@ -170,11 +170,11 @@ class Menu : public uiApp {
       auto cv = canvas();
       cv->selectFont(&fabgl::FONT_SLANT_8x14);
       cv->setPenColor(RGB888(0, 128, 255));
-      cv->drawText(66, 345, "VGA32 MSX Emulator");
+      cv->drawText(66, 300, "VGA32 MSX Emulator");
     };
 
     // programs list
-    fileBrowser = new uiFileBrowser(rootWindow(), Point(5, 10), Size(160, 290), true, STYLE_FILEBROWSER);
+    fileBrowser = new uiFileBrowser(rootWindow(), Point(5, 10), Size(210, 200), true, STYLE_FILEBROWSER);
     fileBrowser->setDirectory(basepath);  // set absolute path
     //fileBrowser->changeDirectory( fileBrowser->content().exists(DOWNDIR, false) ? DOWNDIR : EMBDIR ); // set relative path
     fileBrowser->onChange = [&]() {
@@ -231,7 +231,7 @@ class Menu : public uiApp {
         runMSX();
     };
 
-    int x = 180;
+    int x = 230;
 
     // "Run" button - run the MSX
     auto VIC20Button = new uiButton(rootWindow(), "Run [F12]", Point(x, 10), Size(75, 19), uiButtonKind::Button, true, STYLE_BUTTON);
@@ -267,7 +267,7 @@ class Menu : public uiApp {
     };
 
     // free space label
-    freeSpaceLbl = new uiLabel(rootWindow(), "", Point(5, 304), Size(0, 0), true, STYLE_LABEL);
+    freeSpaceLbl = new uiLabel(rootWindow(), "", Point(5, 214), Size(0, 0), true, STYLE_LABEL);
     updateFreeSpaceLabel();
 
     // focus on programs list
